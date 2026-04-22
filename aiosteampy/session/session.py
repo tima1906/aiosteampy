@@ -7,18 +7,21 @@ from typing import Any, Callable, Self
 from yarl import URL
 
 from ..constants import LIB_ID, EResult, Platform, SteamURL
+from ..exceptions import EResultError
 from ..id import SteamID
-from ..transport import BaseSteamTransport, Cookie, TransportError, TransportResponse, Unauthenticated
+from ..transport import BaseSteamTransport, Cookie, TransportError, TransportResponse, Unauthorized
 from ..webapi import SteamWebAPIClient
 from ..webapi.client import API_HEADERS, BROWSER_HEADERS, COMMUNITY_ORIGIN
 from ..webapi.services.auth import (
     AuthenticationServiceClient,
+    CAuthenticationAllowedConfirmation,
     CAuthenticationGetAuthSessionInfoResponse,
     CAuthenticationPollAuthSessionStatusResponse,
+    EAuthSessionGuardType,
     GuardCodeTypes,
 )
-from .exceptions import *
-from .models import SteamJWT
+from .exceptions import AuthCodeExpired, BadCredentials, GuardConfirmationRequired, LoginError, TooManyAttempts
+from .jwt import SteamJWT
 from .utils import encrypt_password, generate_session_id, parse_qr_challenge_url
 
 ACCESS_TOKEN_COOKIE = "steamLoginSecure"
@@ -396,7 +399,7 @@ class SteamSession:
         device_steam_guard_code: str | Callable[[], str],
         *,
         persistence: bool = True,
-        device_friendly_name: str | None = None,
+        device_friendly_name: str = LIB_ID,
     ):
         """
         Perform full login process with credentials for account that requires `device code` confirmation.
@@ -705,10 +708,12 @@ class SteamSession:
                 redirects=False,
                 response_mode="meta",
             )
-        except Unauthenticated as e:
-            r = e.response
+        except Unauthorized as e:
+            headers = e.headers
+        else:
+            headers = r.headers
 
-        location = URL(r.headers["Location"])
+        location = URL(headers["Location"])
 
         await self._service.webapi.transport.request("GET", location, redirects=False, response_mode="meta")
 

@@ -24,7 +24,7 @@ from yarl import URL
 from ...constants import Platform
 from ..base import BaseSteamTransport
 from ..cookie import Cookie
-from ..exceptions import NetworkError
+from ..exceptions import NetworkError, ProxyError
 from ..resp import TransportResponse
 from ..types import HttpMethod
 
@@ -186,11 +186,16 @@ class WreqTransport(BaseSteamTransport):
                 form=data,
                 json=json,
                 multipart=multipart,
-                redirect=NO_REDIRECT_POLICY,
+                redirect=None if redirects else NO_REDIRECT_POLICY,
             )
 
-        except (ConnectionError, ProxyConnectionError, ConnectionResetError, TlsError, TimeoutError) as e:
+        except ProxyConnectionError as e:
+            raise ProxyError from e
+
+        except (ConnectionError, ConnectionResetError, TlsError, TimeoutError) as e:
             raise NetworkError from e
+
+        status_code = r.status.as_int()
 
         if response_mode == "meta":
             content = None
@@ -198,12 +203,12 @@ class WreqTransport(BaseSteamTransport):
             body = await r.bytes()
             if not body:
                 content = None
+            elif status_code >= 300 or response_mode == "bytes":
+                content = body
             elif response_mode == "text":
                 content = await r.text()
-            elif response_mode == "json":
-                content = await r.json()
             else:
-                content = body
+                content = await r.json()
 
         history = ()
         if redirects:
@@ -218,7 +223,7 @@ class WreqTransport(BaseSteamTransport):
 
         return TransportResponse(
             url=URL(r.url),
-            status=r.status.as_int(),
+            status=status_code,
             headers=HeadersProxy(r.headers),
             content=content,
             history=history,

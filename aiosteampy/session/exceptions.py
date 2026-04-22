@@ -1,5 +1,5 @@
-from ..exceptions import ConfirmationRequired, EResultError, SteamError
-from ..webapi.services.protobufs import CAuthenticationAllowedConfirmation, EAuthSessionGuardType
+from ..exceptions import ConfirmationRequired, RateLimitExceeded, SteamError
+from ..webapi.protobufs.auth import CAuthenticationAllowedConfirmation, EAuthSessionGuardType
 
 
 class LoginError(SteamError):
@@ -14,7 +14,7 @@ class AuthCodeExpired(BadCredentials):
     """Provided `Steam Guard` code has expired."""
 
 
-class TooManyAttempts(LoginError):
+class TooManyAttempts(RateLimitExceeded, LoginError):
     """Too many failed login attempts."""
 
 

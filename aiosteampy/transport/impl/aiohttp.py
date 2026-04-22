@@ -3,12 +3,18 @@
 from http.cookies import BaseCookie, Morsel
 from importlib.metadata import version
 
-from aiohttp import ClientConnectionError, ClientSession, MultipartWriter
+from aiohttp import (
+    ClientConnectionError,
+    ClientHttpProxyError,
+    ClientProxyConnectionError,
+    ClientSession,
+    MultipartWriter,
+)
 from yarl import URL
 
 from ..base import BaseSteamTransport
 from ..cookie import Cookie
-from ..exceptions import NetworkError
+from ..exceptions import NetworkError, ProxyError
 from ..resp import TransportResponse
 from ..utils import format_http_date, parse_http_date
 
@@ -120,21 +126,25 @@ class AiohttpTransport(BaseSteamTransport):
                 raise_for_status=False,
             )
 
+        except (ClientProxyConnectionError, ClientHttpProxyError) as e:
+            raise ProxyError from e
+
         except ClientConnectionError as e:
             raise NetworkError from e
 
-        if response_mode == "meta":  # body is not needed
+        if response_mode == "meta":
+            r.release()
             content = None
         else:  # parse/decode body if present regardless of status
             body = await r.read()
             if not body:
                 content = None
+            elif r.status >= 300 or response_mode == "bytes":
+                content = body
             elif response_mode == "text":
                 content = await r.text()
-            elif response_mode == "json":
-                content = await r.json(content_type=None)  # force to parse as json
-            else:  # bytes by default
-                content = body
+            else:
+                content = await r.json()
 
         history = ()
         if redirects:

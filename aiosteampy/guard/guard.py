@@ -5,9 +5,10 @@ from typing import Self
 from yarl import URL
 
 from ..constants import EResult
+from ..exceptions import EmailConfirmationRequired, EResultError, Unauthenticated
 from ..session import SteamSession, generate_session_id, parse_qr_challenge_url
 from ..session.session import QRChallengeUrl
-from ..transport import BaseSteamTransport, Unauthenticated
+from ..transport import BaseSteamTransport
 from ..webapi import SteamWebAPIClient
 from ..webapi.services.phone import PhoneServiceClient
 from ..webapi.services.twofactor import (
@@ -15,9 +16,15 @@ from ..webapi.services.twofactor import (
     CTwoFactorStatusResponse,
     TwoFactorServiceClient,
 )
+from .account import MaFile, SteamGuardAccount
 from .confirmations import SteamConfirmations
-from .exceptions import *
-from .models import MaFile, SteamGuardAccount
+from .exceptions import (
+    AuthenticatorAlreadyPresent,
+    AuthenticatorError,
+    SmsConfirmationRequired,
+    TooManyAttempts,
+    TwoFactorCodeMismatch,
+)
 from .secrets import IdentitySecret, SharedSecret, TwoFactorSecret
 from .signer import TwoFactorSigner
 from .utils import generate_device_id
